@@ -915,8 +915,10 @@
       const mesh = hits[0].object;
       const eid = meshToExpressId.get(mesh);
       if (eid == null) return;
+      revealInTree(eid);
       const rowEl = document.querySelector(`.tree-row[data-id="${eid}"]`);
       selectById(eid, rowEl);
+      if (rowEl) rowEl.scrollIntoView({ block: 'nearest' });
     });
 
     // ── Render loop ───────────────────────────────────────────────────────────
