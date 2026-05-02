@@ -86,37 +86,6 @@
       flex: 1;
     }
 
-    .upload-btn {
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-    }
-    .upload-btn input[type="file"] {
-      position: absolute; left: 0; top: 0;
-      opacity: 0; width: 100%; height: 100%; cursor: pointer;
-    }
-    #url-input-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0;
-      margin-left: 8px;
-    }
-    #url-input {
-      height: 28px;
-      width: 260px;
-      padding: 0 10px;
-      border: 1px solid var(--orange);
-      border-right: none;
-      background: var(--black);
-      color: var(--white);
-      font-family: 'Inter', system-ui, sans-serif;
-      font-size: 11px;
-      font-weight: 400;
-      outline: none;
-    }
-    #url-input::placeholder { color: #666; }
-    #url-input:focus { border-color: var(--white); }
     .btn {
       padding: 0 16px;
       height: 28px;
@@ -132,6 +101,122 @@
       transition: background 0.15s, color 0.15s;
     }
     .btn:hover { background: var(--black); border-color: var(--black); }
+    .btn.btn-ghost {
+      background: transparent;
+      border-color: #444;
+      color: var(--white);
+    }
+    .btn.btn-ghost:hover { background: #222; border-color: var(--orange); color: var(--white); }
+
+    /* ── Load modal ── */
+    #load-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+    }
+    #load-modal.open { display: flex; }
+    #load-modal-box {
+      background: var(--white);
+      border: 1px solid var(--panel-border);
+      width: 480px;
+      max-width: calc(100vw - 48px);
+    }
+    #load-modal-header {
+      background: var(--black);
+      color: var(--white);
+      padding: 10px 16px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #load-modal-close {
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    #load-modal-close:hover { color: var(--white); }
+    #load-modal-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 2px dashed var(--panel-border);
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--orange);
+      background: #fff8f4;
+    }
+    #drop-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    #drop-zone-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--grey-mid);
+      pointer-events: none;
+    }
+    #drop-zone-sub {
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 4px;
+      pointer-events: none;
+    }
+
+    /* URL row */
+    #modal-url-row {
+      display: flex;
+      gap: 0;
+    }
+    #modal-url-input {
+      flex: 1;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--panel-border);
+      border-right: none;
+      background: var(--white);
+      color: var(--black);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #modal-url-input::placeholder { color: #bbb; }
+    #modal-url-input:focus { border-color: var(--orange); }
+    #modal-url-btn {
+      height: 32px;
+      padding: 0 16px;
+      background: var(--black);
+      border: 1px solid var(--black);
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #modal-url-btn:hover { background: var(--orange); border-color: var(--orange); }
 
     /* ── Main area ── */
     #main { display: flex; flex: 1; overflow: hidden; }
@@ -443,17 +528,30 @@
         <div id="logo-wordmark">Works</div>
       </div>
       <div id="toolbar-title">IFC Viewer</div>
-      <div class="upload-btn">
-          <button class="btn">Load IFC</button>
-          <input type="file" id="file-input" accept=".ifc">
-        </div>
-        <div id="url-input-wrap">
-          <input type="text" id="url-input" placeholder="https://… paste IFC URL" spellcheck="false">
-          <button class="btn" id="url-load-btn">Load URL</button>
-        </div>
-        <button class="btn" id="share-btn" style="display:none; margin-left:8px;">Share</button>
-        <div id="share-toast">Link copied</div>
+      <button class="btn btn-ghost" id="share-btn" style="display:none;">Share</button>
+      <button class="btn" id="open-load-modal-btn">Load IFC</button>
     </div>
+
+    <div id="load-modal">
+      <div id="load-modal-box">
+        <div id="load-modal-header">
+          <span>Load IFC</span>
+          <button id="load-modal-close">✕</button>
+        </div>
+        <div id="load-modal-body">
+          <div id="drop-zone">
+            <input type="file" id="file-input" accept=".ifc">
+            <div id="drop-zone-label">Drop IFC file here</div>
+            <div id="drop-zone-sub">or click to browse</div>
+          </div>
+          <div id="modal-url-row">
+            <input type="text" id="url-input" placeholder="https://… paste IFC URL" spellcheck="false">
+            <button id="modal-url-btn">Load URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="share-toast">Link copied</div>
     <div id="main">
       <div id="viewer-container">
         <div id="loading">Loading…</div>
@@ -1128,6 +1226,38 @@
     fileInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      closeModal();
+      loading.style.display = 'block';
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await loadBytes(bytes);
+      } catch (err) {
+        console.error('Error loading IFC:', err);
+        alert('Laden mislukt: ' + err.message);
+      }
+      loading.style.display = 'none';
+    });
+
+    // ── Load modal ────────────────────────────────────────────────────────────
+    const loadModal = document.getElementById('load-modal');
+    const dropZone  = document.getElementById('drop-zone');
+
+    function openModal()  { loadModal.classList.add('open'); }
+    function closeModal() { loadModal.classList.remove('open'); }
+
+    document.getElementById('open-load-modal-btn').addEventListener('click', openModal);
+    document.getElementById('load-modal-close').addEventListener('click', closeModal);
+    loadModal.addEventListener('click', (e) => { if (e.target === loadModal) closeModal(); });
+
+    // DnD on drop zone
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      closeModal();
       loading.style.display = 'block';
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1140,25 +1270,24 @@
     });
 
     // ── URL loading ───────────────────────────────────────────────────────────
-    const shareBtn  = document.getElementById('share-btn');
+    const shareBtn   = document.getElementById('share-btn');
     const shareToast = document.getElementById('share-toast');
-    const urlInput  = document.getElementById('url-input');
+    const urlInput   = document.getElementById('url-input');
 
     function toDownloadUrl(raw) {
-      // Nextcloud public share: https://…/s/TOKEN → https://…/s/TOKEN/download
       if (/\/s\/[A-Za-z0-9]+$/.test(raw)) return raw + '/download';
       return raw;
     }
 
     async function loadFromUrl(rawUrl) {
       const url = toDownloadUrl(rawUrl);
+      closeModal();
       loading.style.display = 'block';
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const bytes = new Uint8Array(await res.arrayBuffer());
         await loadBytes(bytes);
-        // Update browser URL and show share button
         const shareUrl = location.origin + location.pathname + '?ifc=' + encodeURIComponent(rawUrl);
         history.replaceState(null, '', shareUrl);
         shareBtn.style.display = '';
@@ -1169,21 +1298,20 @@
       loading.style.display = 'none';
     }
 
-    document.getElementById('url-load-btn').addEventListener('click', () => {
+    document.getElementById('modal-url-btn').addEventListener('click', () => {
       const raw = urlInput.value.trim();
       if (!raw) return;
       loadFromUrl(raw);
     });
 
     urlInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('url-load-btn').click();
+      if (e.key === 'Enter') document.getElementById('modal-url-btn').click();
     });
 
-    // Share button — copy viewer URL with ?ifc= to clipboard
+    // Share button
     let toastTimer;
     shareBtn.addEventListener('click', async () => {
-      const url = location.href;
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(location.href);
       shareToast.classList.add('show');
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => shareToast.classList.remove('show'), 2000);
