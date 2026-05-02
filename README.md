@@ -2,6 +2,8 @@
 
 Browser-based IFC viewer built for MAUC Works. Diagnostic tool to inspect geometry and spatial structure produced by IfcOpenShell authoring scripts.
 
+**Live: [maucworks.github.io/web-ifc-viewer](https://maucworks.github.io/web-ifc-viewer/)**
+
 ![IFC Viewer](res/Screenshot%202026-05-02%20at%2016.20.20.png)
 
 ## Stack
