@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAUC · IFC Viewer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+
+    :root {
+      --orange: #FF6600;
+      --black: #000000;
+      --white: #FFFFFF;
+      --grey-bg: #F5F5F5;
+      --grey-mid: #999999;
+      --grey-dim: #666666;
+      --panel-bg: #FFFFFF;
+      --panel-border: #E0E0E0;
+      --panel-text: #111111;
+      --panel-muted: #666666;
+      --panel-hover: #F5F5F5;
+      --panel-selected: #FF6600;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--black);
+      color: var(--white);
+    }
+
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      padding: 0 20px;
+      height: 48px;
+      background: var(--white);
+      color: var(--black);
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      z-index: 10;
+      flex-shrink: 0;
+      border-bottom: 2px solid var(--orange);
+    }
+
+    /* MAUC logo block */
+    #logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-right: 20px;
+      padding-right: 20px;
+      border-right: 1px solid #e0e0e0;
+    }
+    #logo-mark {
+      background: var(--orange);
+      color: var(--white);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      padding: 5px 7px;
+      line-height: 1;
+    }
+    #logo-wordmark {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--black);
+      padding-left: 10px;
+    }
+
+    #toolbar-title {
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--grey-dim);
+      flex: 1;
+    }
+
+    .upload-btn {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+    .upload-btn input[type="file"] {
+      position: absolute; left: 0; top: 0;
+      opacity: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+    .btn {
+      padding: 0 16px;
+      height: 28px;
+      background: var(--orange);
+      border: 1px solid var(--orange);
+      color: var(--white);
+      cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn:hover { background: var(--black); border-color: var(--black); }
+
+    /* ── Main area ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    #viewer-container { flex: 1; position: relative; overflow: hidden; }
+    #viewer-container canvas { width: 100% !important; height: 100% !important; display: block; }
+
+    #loading {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--black);
+      color: var(--white);
+      padding: 16px 32px;
+      border: 1px solid var(--orange);
+      display: none;
+      z-index: 20;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── Side panel ── */
+    #side-panel {
+      width: 280px;
+      min-width: 160px;
+      max-width: 600px;
+      background: var(--panel-bg);
+      color: var(--panel-text);
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--panel-border);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    #panel-header {
+      padding: 10px 14px;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--grey-mid);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-bottom: 1px solid var(--panel-border);
+      flex-shrink: 0;
+      background: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: default;
+    }
+    #panel-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--grey-mid);
+      padding: 0;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s;
+    }
+    #panel-toggle:hover { color: var(--orange); }
+    #side-panel.hidden {
+      width: 0 !important;
+      min-width: 0 !important;
+      border-left: none;
+      overflow: hidden;
+    }
+    #side-panel.hidden #panel-header,
+    #side-panel.hidden #tree-container { display: none; }
+
+    #tree-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 4px 0;
+    }
+    #tree-container::-webkit-scrollbar { width: 4px; }
+    #tree-container::-webkit-scrollbar-track { background: transparent; }
+    #tree-container::-webkit-scrollbar-thumb { background: #333; }
+
+    /* ── Tree nodes ── */
+    .tree-node { user-select: none; }
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 11px;
+      margin: 0;
+      border-bottom: 1px solid transparent;
+    }
+    .tree-row:hover { background: var(--panel-hover); }
+    .tree-row.selected {
+      background: var(--orange);
+      color: var(--white);
+    }
+    .tree-row.selected .tree-type,
+    .tree-row.selected .tree-id,
+    .tree-row.selected .tree-name { color: var(--white); }
+
+    .tree-toggle { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 9px; flex-shrink: 0; }
+    .tree-toggle.has-children { color: #aaa; }
+    .tree-toggle.has-children:hover { color: var(--orange); }
+
+    .tree-label { overflow: hidden; text-overflow: ellipsis; display: flex; align-items: baseline; gap: 5px; }
+    .tree-type { color: var(--orange); font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .tree-name { color: #111; font-weight: 400; }
+    .tree-id { color: #bbb; font-size: 10px; font-family: monospace; }
+    .tree-children { display: none; }
+    .tree-children.open { display: block; }
+
+    /* ── Element info ── */
+    .element-info {
+      background: #FAFAFA;
+      border-left: 2px solid var(--orange);
+      margin: 0;
+      font-size: 11px;
+      border-top: 1px solid #E0E0E0;
+      border-bottom: 1px solid #E0E0E0;
+    }
+    .info-section {
+      padding: 6px 12px;
+      border-bottom: 1px solid #EEEEEE;
+    }
+    .info-section:last-child { border-bottom: none; }
+    .info-section-title {
+      color: var(--orange);
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+      margin-top: 2px;
+    }
+    .info-row {
+      display: flex;
+      gap: 8px;
+      padding: 2px 0;
+      line-height: 1.4;
+    }
+    .info-key {
+      color: #999;
+      min-width: 90px;
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .info-val {
+      color: #111;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 400;
+    }
+    .info-guid {
+      color: #bbb;
+      font-size: 9px;
+      font-family: monospace;
+    }
+    .frame-btn {
+      background: transparent;
+      border: 1px solid #ccc;
+      color: #666;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .frame-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* ── Viewer toolbar ── */
+    #viewer-toolbar {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      display: flex;
+      gap: 1px;
+      z-index: 10;
+    }
+    .viewer-btn {
+      background: var(--white);
+      border: 1px solid #ccc;
+      color: var(--black);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      position: relative;
+    }
+    .viewer-btn:hover { background: var(--orange); border-color: var(--orange); color: var(--white); }
+    .viewer-btn:hover .viewer-btn-tooltip { opacity: 1; }
+    .viewer-btn-tooltip {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--black);
+      color: var(--white);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s;
+    }
+
+    /* ── Resize handle ── */
+    #resize-handle {
+      width: 3px;
+      background: var(--panel-border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      position: relative;
+    }
+    #resize-handle:hover { background: var(--orange); }
+
+    #panel-toggle-wrap {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      pointer-events: none;
+    }
+    #panel-toggle {
+      pointer-events: all;
+      background: var(--white);
+      border: 1px solid var(--panel-border);
+      color: var(--grey-mid);
+      width: 20px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      padding: 0;
+    }
+    #panel-toggle:hover { color: var(--orange); border-color: var(--orange); }
+    #panel-toggle svg {
+      transition: transform 0.3s ease;
+    }
+
+    /* ── Side panel animation ── */
+    #side-panel {
+      transition: width 0.3s ease, min-width 0.3s ease;
+    }
+    #side-panel.hidden {
+      width: 0 !important;
+      min-width: 0 !important;
+      border-left: none;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <div id="logo">
+        <div id="logo-mark">MAUC</div>
+        <div id="logo-wordmark">Works</div>
+      </div>
+      <div id="toolbar-title">IFC Viewer</div>
+      <div class="upload-btn">
+        <button class="btn">Load IFC</button>
+        <input type="file" id="file-input" accept=".ifc">
+      </div>
+    </div>
+    <div id="main">
+      <div id="viewer-container">
+        <div id="loading">Loading…</div>
+        <div id="viewer-toolbar">
+          <button class="viewer-btn" id="btn-frame-all" title="Frame all">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="1" y="1" width="4" height="2" fill="currentColor"/>
+              <rect x="1" y="1" width="2" height="4" fill="currentColor"/>
+              <rect x="11" y="1" width="4" height="2" fill="currentColor"/>
+              <rect x="13" y="1" width="2" height="4" fill="currentColor"/>
+              <rect x="1" y="13" width="4" height="2" fill="currentColor"/>
+              <rect x="1" y="11" width="2" height="4" fill="currentColor"/>
+              <rect x="11" y="13" width="4" height="2" fill="currentColor"/>
+              <rect x="13" y="11" width="2" height="4" fill="currentColor"/>
+              <rect x="5" y="7" width="6" height="2" fill="currentColor"/>
+              <rect x="7" y="5" width="2" height="6" fill="currentColor"/>
+            </svg>
+            <span class="viewer-btn-tooltip">Frame all [A]</span>
+          </button>
+          <button class="viewer-btn" id="btn-frame-sel" title="Frame selection">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
+            </svg>
+            <span class="viewer-btn-tooltip">Frame selection [F]</span>
+          </button>
+        </div>
+      </div>
+      <div id="resize-handle">
+        <div id="panel-toggle-wrap">
+          <button id="panel-toggle" title="Toggle panel">
+            <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 1L1 6L5 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="side-panel">
+        <div id="panel-header">Structure</div>
+        <div id="tree-container"><div style="padding:14px 12px;color:#333;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">No model loaded</div></div>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { Sky } from 'three/examples/jsm/objects/Sky.js';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+    import { IfcAPI } from 'web-ifc';
+
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    // IFC type codes (numeric — named exports are class constructors in browser build)
+    const IFCRELAGGREGATES = 160246688;
+    const IFCRELCONTAINEDINSPATIALSTRUCTURE = 3242617779;
+    const IFCPROJECT = 103090709;
+
+    // ── Scene ────────────────────────────────────────────────────────────────
+    const container = document.getElementById('viewer-container');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(container.clientWidth, container.clientHeight, false);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.5;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      60, container.clientWidth / container.clientHeight, 0.1, 10000
+    );
+    camera.position.set(20, 10, 20);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+
+    // ── Sky shader ────────────────────────────────────────────────────────────
+    const sky = new Sky();
+    sky.scale.setScalar(100000);
+    scene.add(sky);
+
+    const sun = new THREE.Vector3();
+    const skyUniforms = sky.material.uniforms;
+    skyUniforms['turbidity'].value = 4;
+    skyUniforms['rayleigh'].value = 1.5;
+    skyUniforms['mieCoefficient'].value = 0.005;
+    skyUniforms['mieDirectionalG'].value = 0.8;
+
+    const elevation = 25;
+    const azimuth = 180;
+    const phi = THREE.MathUtils.degToRad(90 - elevation);
+    const theta = THREE.MathUtils.degToRad(azimuth);
+    sun.setFromSphericalCoords(1, phi, theta);
+    skyUniforms['sunPosition'].value.copy(sun);
+
+    const sunLight = new THREE.DirectionalLight(0xfff4e0, 2);
+    sunLight.position.copy(sun).multiplyScalar(200);
+    scene.add(sunLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    // ── Grid ──────────────────────────────────────────────────────────────────
+    let grid = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
+    scene.add(grid);
+
+    const axes = new THREE.AxesHelper(10);
+    scene.add(axes);
+
+    // ── web-ifc init ──────────────────────────────────────────────────────────
+    const ifcApi = new IfcAPI();
+    ifcApi.SetWasmPath('/');
+    await ifcApi.Init();
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let currentGroup = null;
+    let spatialTree = null;
+    let loadedBytes = null; // kept for on-demand property queries
+    // expressID → THREE.Mesh[]
+    const expressIdToMeshes = new Map();
+    // expressID → type string (e.g. 'WALL')
+    const expressIdToType = new Map();
+    // expressID → name string
+    const expressIdToName = new Map();
+    // THREE.Mesh → expressID
+    const meshToExpressId = new Map();
+    // selected expressID
+    let selectedId = null;
+    // original materials store: mesh → original material
+    const originalMaterials = new Map();
+
+    // ── Highlight material ────────────────────────────────────────────────────
+    const highlightMat = new THREE.MeshLambertMaterial({
+      color: 0xFF6600,
+      emissive: 0xFF3300,
+      emissiveIntensity: 0.8,
+      transparent: false,
+      side: THREE.DoubleSide,
+    });
+
+
+    // ── Spatial hierarchy ─────────────────────────────────────────────────────
+    function buildHierarchy(modelID) {
+      const children = new Map(); // expressID → [child expressID]
+      const names    = new Map();
+      const types    = new Map();
+
+      function storeMeta(eid) {
+        if (types.has(eid)) return;
+        const typeCode = ifcApi.GetLineType(modelID, eid);
+        const typeName = (ifcApi.GetNameFromTypeCode(typeCode) ?? 'UNKNOWN').replace(/^IFC/i, '');
+        types.set(eid, typeName);
+        try {
+          const line = ifcApi.GetLine(modelID, eid, false);
+          const raw = line?.Name ?? line?.LongName ?? null;
+          names.set(eid, (raw && raw.type === 1) ? String(raw.value) : '');
+        } catch { names.set(eid, ''); }
+      }
+
+      // Aggregation: Project→Site→Building→Storey
+      const aggIDs = ifcApi.GetLineIDsWithType(modelID, IFCRELAGGREGATES);
+      for (let i = 0; i < aggIDs.size(); i++) {
+        try {
+          const rel = ifcApi.GetLine(modelID, aggIDs.get(i), false);
+          const parentId = rel.RelatingObject?.value;
+          const relObjs  = rel.RelatedObjects;
+          if (!parentId || !relObjs) continue;
+          storeMeta(parentId);
+          if (!children.has(parentId)) children.set(parentId, []);
+          for (const obj of relObjs) {
+            storeMeta(obj.value);
+            children.get(parentId).push(obj.value);
+          }
+        } catch { /* skip broken rel */ }
+      }
+
+      // Containment: Storey→elements
+      const contIDs = ifcApi.GetLineIDsWithType(modelID, IFCRELCONTAINEDINSPATIALSTRUCTURE);
+      for (let i = 0; i < contIDs.size(); i++) {
+        try {
+          const rel = ifcApi.GetLine(modelID, contIDs.get(i), false);
+          const parentId = rel.RelatingStructure?.value;
+          const relElems = rel.RelatedElements;
+          if (!parentId || !relElems) continue;
+          storeMeta(parentId);
+          if (!children.has(parentId)) children.set(parentId, []);
+          for (const elem of relElems) {
+            storeMeta(elem.value);
+            children.get(parentId).push(elem.value);
+          }
+        } catch { /* skip broken rel */ }
+      }
+
+      const projIDs = ifcApi.GetLineIDsWithType(modelID, IFCPROJECT);
+      const rootId  = projIDs.size() > 0 ? projIDs.get(0) : null;
+      if (rootId) storeMeta(rootId);
+
+      // Build parent map once for revealInTree
+      const parentMap = new Map();
+      function walkParents(eid) {
+        for (const kid of (children.get(eid) ?? [])) {
+          parentMap.set(kid, eid);
+          walkParents(kid);
+        }
+      }
+      if (rootId) walkParents(rootId);
+
+      return { rootId, children, names, types, parentMap };
+    }
+
+    // ── Render spatial tree ───────────────────────────────────────────────────
+    function renderTree() {
+      const panel = document.getElementById('tree-container');
+      panel.innerHTML = '';
+      if (!spatialTree || !spatialTree.rootId) {
+        panel.innerHTML = '<div style="padding:12px;color:#555;font-size:12px;">No hierarchy</div>';
+        return;
+      }
+      const { rootId, children, names, types } = spatialTree;
+
+      function buildNode(eid, depth) {
+        const type     = types.get(eid) ?? '?';
+        const name     = names.get(eid) ?? expressIdToName.get(eid) ?? '';
+        const kids     = children.get(eid) ?? [];
+        const hasKids  = kids.length > 0;
+        const hasMesh  = expressIdToMeshes.has(eid);
+
+        const nodeEl = document.createElement('div');
+        nodeEl.className = 'tree-node';
+
+        const rowEl = document.createElement('div');
+        rowEl.className = 'tree-row';
+        rowEl.dataset.id = eid;
+        rowEl.style.paddingLeft = `${8 + depth * 16}px`;
+
+        const toggle = document.createElement('div');
+        toggle.className = 'tree-toggle' + (hasKids ? ' has-children' : '');
+        toggle.textContent = hasKids ? '▶' : '·';
+
+        const label = document.createElement('div');
+        label.className = 'tree-label';
+        label.innerHTML = `<span class="tree-type">${esc(type)}</span><span class="tree-name">${esc(name)}</span><span class="tree-id">#${eid}</span>`;
+
+        rowEl.appendChild(toggle);
+        rowEl.appendChild(label);
+        nodeEl.appendChild(rowEl);
+
+        if (hasMesh) rowEl.addEventListener('click', () => selectById(eid, rowEl));
+
+        if (hasKids) {
+          const childrenEl = document.createElement('div');
+          childrenEl.className = 'tree-children';
+          nodeEl.appendChild(childrenEl);
+          let built = false;
+
+          toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = childrenEl.classList.toggle('open');
+            toggle.textContent = open ? '▼' : '▶';
+            if (open && !built) {
+              built = true;
+              for (const kid of kids) childrenEl.appendChild(buildNode(kid, depth + 1));
+            }
+          });
+        }
+
+        return nodeEl;
+      }
+
+      panel.appendChild(buildNode(rootId, 0));
+    }
+
+    // ── Element properties (opens model on demand) ────────────────────────────
+    function getElementProperties(expressID) {
+      if (!loadedBytes) return null;
+      const IFCRELDEFINESBYPROPERTIES  = 4186316022;
+      const IFCRELASSOCIATESMATERIAL   = 2655215786;
+      const mid = ifcApi.OpenModel(loadedBytes, { COORDINATE_TO_ORIGIN: false });
+      const result = { basis: {}, psets: [], material: null, quantities: [] };
+      try {
+        const line = ifcApi.GetLine(mid, expressID, false);
+        result.basis.type      = expressIdToType.get(expressID) ?? '?';
+        result.basis.name      = expressIdToName.get(expressID) ?? '';
+        result.basis.expressID = expressID;
+        const gid = line?.GlobalId;
+        result.basis.globalId  = (gid && gid.type === 1) ? gid.value : '';
+
+        // Psets + Quantities
+        const defIDs = ifcApi.GetLineIDsWithType(mid, IFCRELDEFINESBYPROPERTIES);
+        for (let i = 0; i < defIDs.size(); i++) {
+          try {
+            const rel = ifcApi.GetLine(mid, defIDs.get(i), false);
+            const relObjs = rel.RelatedObjects ?? [];
+            const isRelated = relObjs.some(o => o.value === expressID);
+            if (!isRelated) continue;
+            const defId = rel.RelatingPropertyDefinition?.value;
+            if (!defId) continue;
+            const def = ifcApi.GetLine(mid, defId, false);
+            const defType = ifcApi.GetNameFromTypeCode(ifcApi.GetLineType(mid, defId)) ?? '';
+            const psetName = (def?.Name?.value) ?? defType;
+            if (defType === 'IFCELEMENTQUANTITY') {
+              const qs = (def.Quantities ?? []).map(q => {
+                try {
+                  const qline = ifcApi.GetLine(mid, q.value, false);
+                  const qName = qline?.Name?.value ?? '?';
+                  // find first numeric value field
+                  const val = qline?.LengthValue ?? qline?.AreaValue ?? qline?.VolumeValue ?? qline?.WeightValue ?? qline?.CountValue ?? null;
+                  const num = (val && val.value !== undefined) ? val.value : (typeof val === 'number' ? val : null);
+                  return { name: qName, value: num !== null ? Number(num).toFixed(4) : '?' };
+                } catch { return null; }
+              }).filter(Boolean);
+              result.quantities.push({ name: psetName, items: qs });
+            } else {
+              const props = (def.HasProperties ?? []).map(p => {
+                try {
+                  const pline = ifcApi.GetLine(mid, p.value, false);
+                  const pName = pline?.Name?.value ?? '?';
+                  const nom = pline?.NominalValue;
+                  const pVal = (nom && nom.value !== undefined) ? String(nom.value) : '?';
+                  return { name: pName, value: pVal };
+                } catch { return null; }
+              }).filter(Boolean);
+              result.psets.push({ name: psetName, items: props });
+            }
+          } catch { /* skip */ }
+        }
+
+        // Material
+        const matIDs = ifcApi.GetLineIDsWithType(mid, IFCRELASSOCIATESMATERIAL);
+        for (let i = 0; i < matIDs.size(); i++) {
+          try {
+            const rel = ifcApi.GetLine(mid, matIDs.get(i), false);
+            const relObjs = rel.RelatedObjects ?? [];
+            if (!relObjs.some(o => o.value === expressID)) continue;
+            const matRef = rel.RelatingMaterial?.value;
+            if (!matRef) continue;
+            const mat = ifcApi.GetLine(mid, matRef, false);
+            const matName = mat?.Name?.value ?? mat?.Name ?? null;
+            result.material = matName ? String(matName) : null;
+            break;
+          } catch { /* skip */ }
+        }
+      } finally {
+        ifcApi.CloseModel(mid);
+      }
+      return result;
+    }
+
+    // ── Render info panel under selected tree row ─────────────────────────────
+    let infoEl = null;
+
+    function showInfo(expressID, rowEl) {
+      // Remove previous info
+      if (infoEl) { infoEl.remove(); infoEl = null; }
+
+      const props = getElementProperties(expressID);
+      if (!props) return;
+
+      infoEl = document.createElement('div');
+      infoEl.className = 'element-info';
+
+      let html = `<div class="info-section">`;
+      html += `<div class="info-row"><span class="info-key">Type</span><span class="info-val">${esc(props.basis.type)}</span></div>`;
+      html += `<div class="info-row"><span class="info-key">Name</span><span class="info-val">${esc(props.basis.name || '—')}</span></div>`;
+      html += `<div class="info-row"><span class="info-key">GlobalId</span><span class="info-val info-guid">${esc(props.basis.globalId || '—')}</span></div>`;
+      html += `<div class="info-row"><span class="info-key">expressID</span><span class="info-val">#${props.basis.expressID}</span></div>`;
+      if (props.material) html += `<div class="info-row"><span class="info-key">Material</span><span class="info-val">${esc(props.material)}</span></div>`;
+      html += `<div class="info-row" style="margin-top:6px;"><button class="frame-btn" data-eid="${props.basis.expressID}">⊙ Frame view</button></div>`;
+      html += `</div>`;
+
+      for (const pset of props.psets) {
+        html += `<div class="info-section"><div class="info-section-title">${esc(pset.name)}</div>`;
+        for (const item of pset.items) {
+          html += `<div class="info-row"><span class="info-key">${esc(item.name)}</span><span class="info-val">${esc(item.value)}</span></div>`;
+        }
+        html += `</div>`;
+      }
+
+      for (const qset of props.quantities) {
+        html += `<div class="info-section"><div class="info-section-title">${esc(qset.name)}</div>`;
+        for (const item of qset.items) {
+          html += `<div class="info-row"><span class="info-key">${esc(item.name)}</span><span class="info-val">${esc(item.value)}</span></div>`;
+        }
+        html += `</div>`;
+      }
+
+      infoEl.innerHTML = html;
+      infoEl.querySelector('.frame-btn')?.addEventListener('click', () => frameSelection());
+      rowEl.insertAdjacentElement('afterend', infoEl);
+    }
+
+    // ── Selection ─────────────────────────────────────────────────────────────
+    function selectById(expressID, rowEl) {
+      // Deselect previous
+      if (selectedId !== null) {
+        const prevMeshes = expressIdToMeshes.get(selectedId) ?? [];
+        for (const m of prevMeshes) {
+          if (originalMaterials.has(m)) {
+            m.material = originalMaterials.get(m);
+          }
+        }
+        document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
+      }
+
+      // Toggle off if same element clicked again
+      if (selectedId === expressID) {
+        const curMeshes = expressIdToMeshes.get(selectedId) ?? [];
+        for (const m of curMeshes) {
+          if (originalMaterials.has(m)) {
+            m.material = originalMaterials.get(m);
+            originalMaterials.delete(m);
+          }
+        }
+        document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
+        selectedId = null;
+        if (infoEl) { infoEl.remove(); infoEl = null; }
+        return;
+      }
+
+      selectedId = expressID;
+      rowEl?.classList.add('selected');
+
+      const meshes = expressIdToMeshes.get(expressID) ?? [];
+      for (const m of meshes) {
+        if (!originalMaterials.has(m)) originalMaterials.set(m, m.material);
+        m.material = highlightMat;
+      }
+
+      if (rowEl) showInfo(expressID, rowEl);
+    }
+
+    function frameSelection() {
+      if (selectedId === null) return;
+      const meshes = expressIdToMeshes.get(selectedId) ?? [];
+      if (meshes.length === 0) return;
+      const box = new THREE.Box3();
+      for (const m of meshes) box.expandByObject(m);
+      if (box.isEmpty()) return;
+      const center = new THREE.Vector3();
+      const size = new THREE.Vector3();
+      box.getCenter(center);
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z, 0.1);
+      camera.position.copy(center).add(new THREE.Vector3(maxDim, maxDim * 0.5, maxDim));
+      controls.target.copy(center);
+      camera.near = maxDim * 0.001;
+      camera.far = maxDim * 100;
+      camera.updateProjectionMatrix();
+      controls.update();
+    }
+
+    // F key → frame selection
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') frameSelection();
+      if (e.key === 'a' || e.key === 'A') frameAll();
+    });
+
+    function frameAll() {
+      if (!currentGroup) return;
+      const box = new THREE.Box3().setFromObject(currentGroup);
+      if (box.isEmpty()) return;
+      const center = new THREE.Vector3();
+      const size = new THREE.Vector3();
+      box.getCenter(center);
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z, 0.1);
+      camera.position.copy(center).add(new THREE.Vector3(maxDim, maxDim * 0.5, maxDim));
+      controls.target.copy(center);
+      camera.near = maxDim * 0.001;
+      camera.far = maxDim * 100;
+      camera.updateProjectionMatrix();
+      controls.update();
+    }
+
+    // ── Reveal tree node (open parents, force lazy build) ────────────────────
+    function revealInTree(targetEid) {
+      if (!spatialTree) return;
+      const { parentMap } = spatialTree;
+
+      // Build ancestor chain from target to root
+      const chain = [];
+      let cur = parentMap.get(targetEid);
+      while (cur != null) { chain.unshift(cur); cur = parentMap.get(cur); }
+
+      // Open each ancestor node in the DOM, triggering lazy build if needed
+      for (const ancestorEid of chain) {
+        const ancestorRow = document.querySelector(`.tree-row[data-id="${ancestorEid}"]`);
+        if (!ancestorRow) continue;
+        const nodeEl = ancestorRow.parentElement;
+        const childrenEl = nodeEl?.querySelector('.tree-children');
+        const toggle = ancestorRow.querySelector('.tree-toggle');
+        if (!childrenEl || childrenEl.classList.contains('open')) continue;
+        // Simulate toggle click to trigger lazy build
+        toggle?.click();
+      }
+    }
+
+    // ── Raycasting ────────────────────────────────────────────────────────────
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('click', (e) => {
+      if (!currentGroup) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+      mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(currentGroup.children, false);
+      if (hits.length === 0) return;
+      const mesh = hits[0].object;
+      const eid = meshToExpressId.get(mesh);
+      if (eid == null) return;
+      const rowEl = document.querySelector(`.tree-row[data-id="${eid}"]`);
+      selectById(eid, rowEl);
+    });
+
+    // ── Render loop ───────────────────────────────────────────────────────────
+    renderer.setAnimationLoop(() => {
+      // Keep drawingbuffer in sync with canvas CSS size every frame
+      const canvas = renderer.domElement;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    });
+
+    // ── File loading ──────────────────────────────────────────────────────────
+    const fileInput = document.getElementById('file-input');
+    const loading = document.getElementById('loading');
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      loading.style.display = 'block';
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        loadedBytes = bytes;
+
+        const modelID = ifcApi.OpenModel(bytes, { COORDINATE_TO_ORIGIN: false });
+
+        // Clear previous
+        if (currentGroup) { scene.remove(currentGroup); currentGroup = null; }
+        if (infoEl) { infoEl.remove(); infoEl = null; }
+        spatialTree = null;
+        expressIdToMeshes.clear();
+        expressIdToType.clear();
+        expressIdToName.clear();
+        meshToExpressId.clear();
+        originalMaterials.clear();
+        selectedId = null;
+
+        const group = new THREE.Group();
+        const bbox = new THREE.Box3();
+        let missing = 0;
+        let total = 0;
+        const matCache = new Map(); // 'r,g,b,a' → MeshLambertMaterial
+
+        ifcApi.StreamAllMeshes(modelID, (flatMesh) => {
+          total++;
+          const expressID = flatMesh.expressID;
+          const geoms = flatMesh.geometries;
+          const size = geoms.size();
+          // Store type and name while model is still open
+          const typeCode = ifcApi.GetLineType(modelID, expressID);
+          const typeName = (ifcApi.GetNameFromTypeCode(typeCode) ?? 'UNKNOWN').replace(/^IFC/i, '');
+          expressIdToType.set(expressID, typeName);
+          try {
+            const line = ifcApi.GetLine(modelID, expressID, false);
+            const raw = line?.Name;
+            const name = (raw && raw.type === 1) ? String(raw.value) : '';
+            expressIdToName.set(expressID, name);
+          } catch { expressIdToName.set(expressID, ''); }
+          if (size === 0) { missing++; return; }
+
+          for (let i = 0; i < size; i++) {
+            const pg = geoms.get(i);
+            const ifcGeom = ifcApi.GetGeometry(modelID, pg.geometryExpressID);
+
+            const verts = ifcApi.GetVertexArray(
+              ifcGeom.GetVertexData(),
+              ifcGeom.GetVertexDataSize()
+            );
+            const idxs = ifcApi.GetIndexArray(
+              ifcGeom.GetIndexData(),
+              ifcGeom.GetIndexDataSize()
+            );
+
+            const vertCount = verts.length / 6;
+            const pos = new Float32Array(vertCount * 3);
+            const nor = new Float32Array(vertCount * 3);
+            for (let j = 0; j < vertCount; j++) {
+              pos[j * 3]     = verts[j * 6];
+              pos[j * 3 + 1] = verts[j * 6 + 1];
+              pos[j * 3 + 2] = verts[j * 6 + 2];
+              nor[j * 3]     = verts[j * 6 + 3];
+              nor[j * 3 + 1] = verts[j * 6 + 4];
+              nor[j * 3 + 2] = verts[j * 6 + 5];
+            }
+
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            geom.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+            geom.setIndex(new THREE.BufferAttribute(idxs, 1));
+
+            const { x: r, y: g, z: b, w: a } = pg.color;
+            const matKey = `${r},${g},${b},${a}`;
+            let mat = matCache.get(matKey);
+            if (!mat) {
+              mat = new THREE.MeshLambertMaterial({
+                color: new THREE.Color(r, g, b),
+                transparent: a < 1,
+                opacity: a,
+                side: THREE.DoubleSide,
+              });
+              matCache.set(matKey, mat);
+            }
+
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.matrix.fromArray(pg.flatTransformation);
+            mesh.matrixAutoUpdate = false;
+            group.add(mesh);
+
+            // Register expressID ↔ mesh mapping
+            meshToExpressId.set(mesh, expressID);
+            if (!expressIdToMeshes.has(expressID)) expressIdToMeshes.set(expressID, []);
+            expressIdToMeshes.get(expressID).push(mesh);
+
+            ifcGeom.delete();
+          }
+        });
+
+        // Build hierarchy before closing model
+        spatialTree = buildHierarchy(modelID);
+
+        ifcApi.CloseModel(modelID);
+
+        scene.add(group);
+        currentGroup = group;
+
+        group.updateMatrixWorld(true);
+        bbox.setFromObject(group);
+
+        console.log(`web-ifc: ${total} meshes, ${missing} missing geometry`);
+
+        renderTree();
+
+        if (!bbox.isEmpty()) {
+          const center = new THREE.Vector3();
+          const size = new THREE.Vector3();
+          bbox.getCenter(center);
+          bbox.getSize(size);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          console.log('bbox — center:', center, 'maxDim:', maxDim.toFixed(2) + 'm');
+
+          const maxReach = Math.ceil(Math.max(
+            Math.abs(bbox.min.x), Math.abs(bbox.max.x),
+            Math.abs(bbox.min.z), Math.abs(bbox.max.z)
+          ));
+          const gridSize = maxReach * 2;
+          scene.remove(grid);
+          grid = new THREE.GridHelper(gridSize, gridSize, 0x444444, 0x222222);
+          scene.add(grid);
+
+          camera.position.copy(center).add(new THREE.Vector3(maxDim, maxDim * 0.5, maxDim));
+          controls.target.copy(center);
+          camera.near = maxDim * 0.001;
+          camera.far = maxDim * 100;
+          camera.updateProjectionMatrix();
+          controls.update();
+        }
+      } catch (err) {
+        console.error('Error loading IFC:', err);
+        alert('Laden mislukt: ' + err.message);
+      }
+      loading.style.display = 'none';
+    });
+
+    // ── Side panel toggle ─────────────────────────────────────────────────────
+    const sidePanel = document.getElementById('side-panel');
+    const panelToggle = document.getElementById('panel-toggle');
+    const panelToggleIcon = panelToggle.querySelector('svg');
+    panelToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const hidden = sidePanel.classList.toggle('hidden');
+      panelToggleIcon.style.transform = hidden ? 'rotate(180deg)' : '';
+    });
+
+    // ── Viewer toolbar buttons ────────────────────────────────────────────────
+    document.getElementById('btn-frame-all').addEventListener('click', frameAll);
+    document.getElementById('btn-frame-sel').addEventListener('click', frameSelection);
+
+    // ── Panel resize handle ───────────────────────────────────────────────────
+    const resizeHandle = document.getElementById('resize-handle');
+    let resizing = false;
+
+    resizeHandle.addEventListener('mousedown', () => { resizing = true; });
+    window.addEventListener('mousemove', (e) => {
+      if (!resizing) return;
+      const mainRect = document.getElementById('main').getBoundingClientRect();
+      const newWidth = mainRect.right - e.clientX;
+      sidePanel.style.width = Math.min(600, Math.max(160, newWidth)) + 'px';
+    });
+    window.addEventListener('mouseup', () => { resizing = false; });
+
+  </script>
+</body>
+</html>
