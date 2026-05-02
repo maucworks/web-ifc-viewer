@@ -514,7 +514,7 @@
 
     // ── web-ifc init ──────────────────────────────────────────────────────────
     const ifcApi = new IfcAPI();
-    ifcApi.SetWasmPath('/');
+    ifcApi.SetWasmPath(import.meta.env.BASE_URL);
     await ifcApi.Init();
 
     // ── State ─────────────────────────────────────────────────────────────────
