@@ -7,7 +7,8 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
 
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important;
+    border-style: none;}
 
     :root {
       --orange: #FF6600;
@@ -187,6 +188,15 @@
       display: flex;
       gap: 0;
     }
+    #url-input {
+      flex: 1;
+    }
+
+    #url-input {
+
+      border: 1px solid var(--panel-border);
+    }
+
     #modal-url-input {
       flex: 1;
       height: 32px;
@@ -482,8 +492,6 @@
       transition: transform 0.3s ease;
     }
 
-    #share-btn { background: var(--black); border-color: #444; }
-    #share-btn:hover { background: #222; border-color: var(--orange); }
     #share-toast {
       position: fixed;
       bottom: 24px;
