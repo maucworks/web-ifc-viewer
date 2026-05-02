@@ -96,6 +96,27 @@
       position: absolute; left: 0; top: 0;
       opacity: 0; width: 100%; height: 100%; cursor: pointer;
     }
+    #url-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-left: 8px;
+    }
+    #url-input {
+      height: 28px;
+      width: 260px;
+      padding: 0 10px;
+      border: 1px solid var(--orange);
+      border-right: none;
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 400;
+      outline: none;
+    }
+    #url-input::placeholder { color: #666; }
+    #url-input:focus { border-color: var(--white); }
     .btn {
       padding: 0 16px;
       height: 28px;
@@ -376,6 +397,32 @@
       transition: transform 0.3s ease;
     }
 
+    #share-btn { background: var(--black); border-color: #444; }
+    #share-btn:hover { background: #222; border-color: var(--orange); }
+    #share-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 8px 18px;
+      border: 1px solid var(--orange);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 100;
+    }
+    #share-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     /* ── Side panel animation ── */
     #side-panel {
       transition: width 0.3s ease, min-width 0.3s ease;
@@ -397,9 +444,15 @@
       </div>
       <div id="toolbar-title">IFC Viewer</div>
       <div class="upload-btn">
-        <button class="btn">Load IFC</button>
-        <input type="file" id="file-input" accept=".ifc">
-      </div>
+          <button class="btn">Load IFC</button>
+          <input type="file" id="file-input" accept=".ifc">
+        </div>
+        <div id="url-input-wrap">
+          <input type="text" id="url-input" placeholder="https://… paste IFC URL" spellcheck="false">
+          <button class="btn" id="url-load-btn">Load URL</button>
+        </div>
+        <button class="btn" id="share-btn" style="display:none; margin-left:8px;">Share</button>
+        <div id="share-toast">Link copied</div>
     </div>
     <div id="main">
       <div id="viewer-container">
@@ -939,13 +992,7 @@
     const fileInput = document.getElementById('file-input');
     const loading = document.getElementById('loading');
 
-    fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      loading.style.display = 'block';
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
+    async function loadBytes(bytes) {
         loadedBytes = bytes;
 
         const modelID = ifcApi.OpenModel(bytes, { COORDINATE_TO_ORIGIN: false });
@@ -965,14 +1012,13 @@
         const bbox = new THREE.Box3();
         let missing = 0;
         let total = 0;
-        const matCache = new Map(); // 'r,g,b,a' → MeshLambertMaterial
+        const matCache = new Map();
 
         ifcApi.StreamAllMeshes(modelID, (flatMesh) => {
           total++;
           const expressID = flatMesh.expressID;
           const geoms = flatMesh.geometries;
           const size = geoms.size();
-          // Store type and name while model is still open
           const typeCode = ifcApi.GetLineType(modelID, expressID);
           const typeName = (ifcApi.GetNameFromTypeCode(typeCode) ?? 'UNKNOWN').replace(/^IFC/i, '');
           expressIdToType.set(expressID, typeName);
@@ -1032,7 +1078,6 @@
             mesh.matrixAutoUpdate = false;
             group.add(mesh);
 
-            // Register expressID ↔ mesh mapping
             meshToExpressId.set(mesh, expressID);
             if (!expressIdToMeshes.has(expressID)) expressIdToMeshes.set(expressID, []);
             expressIdToMeshes.get(expressID).push(mesh);
@@ -1041,9 +1086,7 @@
           }
         });
 
-        // Build hierarchy before closing model
         spatialTree = buildHierarchy(modelID);
-
         ifcApi.CloseModel(modelID);
 
         scene.add(group);
@@ -1080,12 +1123,79 @@
           camera.updateProjectionMatrix();
           controls.update();
         }
+    }
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      loading.style.display = 'block';
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await loadBytes(bytes);
       } catch (err) {
         console.error('Error loading IFC:', err);
         alert('Laden mislukt: ' + err.message);
       }
       loading.style.display = 'none';
     });
+
+    // ── URL loading ───────────────────────────────────────────────────────────
+    const shareBtn  = document.getElementById('share-btn');
+    const shareToast = document.getElementById('share-toast');
+    const urlInput  = document.getElementById('url-input');
+
+    function toDownloadUrl(raw) {
+      // Nextcloud public share: https://…/s/TOKEN → https://…/s/TOKEN/download
+      if (/\/s\/[A-Za-z0-9]+$/.test(raw)) return raw + '/download';
+      return raw;
+    }
+
+    async function loadFromUrl(rawUrl) {
+      const url = toDownloadUrl(rawUrl);
+      loading.style.display = 'block';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        await loadBytes(bytes);
+        // Update browser URL and show share button
+        const shareUrl = location.origin + location.pathname + '?ifc=' + encodeURIComponent(rawUrl);
+        history.replaceState(null, '', shareUrl);
+        shareBtn.style.display = '';
+      } catch (err) {
+        console.error('Error loading IFC from URL:', err);
+        alert('Laden mislukt: ' + err.message);
+      }
+      loading.style.display = 'none';
+    }
+
+    document.getElementById('url-load-btn').addEventListener('click', () => {
+      const raw = urlInput.value.trim();
+      if (!raw) return;
+      loadFromUrl(raw);
+    });
+
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('url-load-btn').click();
+    });
+
+    // Share button — copy viewer URL with ?ifc= to clipboard
+    let toastTimer;
+    shareBtn.addEventListener('click', async () => {
+      const url = location.href;
+      await navigator.clipboard.writeText(url);
+      shareToast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => shareToast.classList.remove('show'), 2000);
+    });
+
+    // Auto-load from ?ifc= query param on page load
+    const params = new URLSearchParams(location.search);
+    const ifcParam = params.get('ifc');
+    if (ifcParam) {
+      urlInput.value = ifcParam;
+      loadFromUrl(ifcParam);
+    }
 
     // ── Side panel toggle ─────────────────────────────────────────────────────
     const sidePanel = document.getElementById('side-panel');
