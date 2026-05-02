@@ -41,8 +41,8 @@
       background: var(--white);
       color: var(--black);
       display: flex;
-      align-items: stretch;
-      gap: 0;
+      align-items: center;
+      gap: 8px;
       z-index: 10;
       flex-shrink: 0;
       border-bottom: 2px solid var(--orange);
@@ -126,7 +126,7 @@
       max-width: calc(100vw - 48px);
     }
     #load-modal-header {
-      background: var(--black);
+      background: var(--orange);
       color: var(--white);
       padding: 10px 16px;
       font-size: 10px;
@@ -140,7 +140,7 @@
     #load-modal-close {
       background: none;
       border: none;
-      color: #888;
+      color: rgba(255,255,255,0.7);
       cursor: pointer;
       font-size: 16px;
       line-height: 1;
@@ -205,8 +205,8 @@
     #modal-url-btn {
       height: 32px;
       padding: 0 16px;
-      background: var(--black);
-      border: 1px solid var(--black);
+      background: var(--orange);
+      border: 1px solid var(--orange);
       color: var(--white);
       font-family: 'Inter', system-ui, sans-serif;
       font-size: 11px;
@@ -216,7 +216,7 @@
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
     }
-    #modal-url-btn:hover { background: var(--orange); border-color: var(--orange); }
+    #modal-url-btn:hover { background: var(--black); border-color: var(--black); }
 
     /* ── Main area ── */
     #main { display: flex; flex: 1; overflow: hidden; }
