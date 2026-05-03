@@ -599,6 +599,8 @@
       </div>
       <div id="side-panel">
         <div id="panel-header">Structure</div>
+        <div id="drawings-header" style="display:none;padding:10px 14px;font-size:10px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:0.1em;border-top:1px solid #e0e0e0;background:#fafafa;">Drawings</div>
+        <div id="drawings-container" style="display:none;"></div>
         <div id="tree-container"><div style="padding:14px 12px;color:#333;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">No model loaded</div></div>
       </div>
     </div>
@@ -619,7 +621,7 @@
     // ── Scene ────────────────────────────────────────────────────────────────
     const container = document.getElementById('viewer-container');
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(container.clientWidth, container.clientHeight, false);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -676,10 +678,13 @@
     ifcApi.SetWasmPath(import.meta.env.BASE_URL);
     await ifcApi.Init();
 
+    import { initSectionCut, extractDrawings, applySectionCut, clearSectionCut, getActiveDrawingId } from './section-cut.js';
+
     // ── State ─────────────────────────────────────────────────────────────────
     let currentGroup = null;
     let spatialTree = null;
     let loadedBytes = null; // kept for on-demand property queries
+    let currentModelID = null;
     // expressID → THREE.Mesh[]
     const expressIdToMeshes = new Map();
     // expressID → type string (e.g. 'WALL')
@@ -692,6 +697,11 @@
     let selectedId = null;
     // original materials store: mesh → original material
     const originalMaterials = new Map();
+    // current drawings list
+    let drawings = [];
+
+    // Initialize section cut module
+    initSectionCut(ifcApi, scene, renderer);
 
     // ── Highlight material ────────────────────────────────────────────────────
     const highlightMat = new THREE.MeshLambertMaterial({
@@ -701,7 +711,6 @@
       transparent: false,
       side: THREE.DoubleSide,
     });
-
 
     // ── Spatial hierarchy ─────────────────────────────────────────────────────
     function buildHierarchy(modelID) {
@@ -832,6 +841,39 @@
       }
 
       panel.appendChild(buildNode(rootId, 0));
+    }
+
+    function renderDrawings() {
+      const header = document.getElementById('drawings-header');
+      const container = document.getElementById('drawings-container');
+
+      if (!drawings || drawings.length === 0) {
+        header.style.display = 'none';
+        container.style.display = 'none';
+        return;
+      }
+
+      header.style.display = 'block';
+      container.style.display = 'block';
+      container.innerHTML = '';
+
+      for (const drawing of drawings) {
+        const row = document.createElement('div');
+        row.className = 'tree-row';
+        row.style.paddingLeft = '14px';
+
+        const icon = drawing.targetView === 'SECTION_VIEW' ? '✂️' : '📄';
+        const active = getActiveDrawingId() === drawing.expressID ? ' selected' : '';
+
+        row.innerHTML = `<span class="tree-type">${icon}</span><span class="tree-name${active}">${esc(drawing.name)}</span>`;
+
+        row.addEventListener('click', async () => {
+          await applySectionCut(drawing, expressIdToMeshes);
+          renderDrawings();
+        });
+
+        container.appendChild(row);
+      }
     }
 
     // ── Element properties (opens model on demand) ────────────────────────────
@@ -1101,7 +1143,11 @@
     async function loadBytes(bytes) {
         loadedBytes = bytes;
 
+        // Clear section cut if active
+        await clearSectionCut();
+
         const modelID = ifcApi.OpenModel(bytes, { COORDINATE_TO_ORIGIN: false });
+        currentModelID = modelID;
 
         // Clear previous
         if (currentGroup) { scene.remove(currentGroup); currentGroup = null; }
@@ -1193,6 +1239,8 @@
         });
 
         spatialTree = buildHierarchy(modelID);
+        drawings = extractDrawings(modelID);
+        renderDrawings();
         ifcApi.CloseModel(modelID);
 
         scene.add(group);
